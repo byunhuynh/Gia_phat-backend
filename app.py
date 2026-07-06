@@ -174,7 +174,7 @@ def create_app() -> Flask:
     # ──────────────────────────────────────────────────────────────
     @app.route("/", methods=["GET"])
     def health():
-        return jsonify({"status": "running", "msg": "NhatMinh API System"})
+        return jsonify({"status": "running", "msg": "GiaPhat API System"})
 
     # ──────────────────────────────────────────────────────────────
     # GLOBAL ERROR HANDLERS
