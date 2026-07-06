@@ -1,5 +1,5 @@
 """
-NhatMinh Backend – Application Factory
+Gia Phat Backend – Application Factory
 """
 import logging
 import logging.config

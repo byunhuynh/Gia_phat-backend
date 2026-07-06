@@ -14,7 +14,7 @@ ACCESS_TOKEN_MINUTES = int(os.getenv("ACCESS_TOKEN_MINUTES", 15))
 REFRESH_TOKEN_DAYS = int(os.getenv("REFRESH_TOKEN_DAYS", 7))
 
 # ─── WebAuthn / Passkeys ───────────────────────────────────────────────────────
-# RP_ID phải là effective domain của origin (ví dụ: "nhatminhvn.com" hoặc "localhost")
+# RP_ID phải là effective domain của origin (ví dụ: "giaphatgroup.com" hoặc "localhost")
 WEBAUTHN_RP_ID = os.getenv("WEBAUTHN_RP_ID", "localhost")
 WEBAUTHN_RP_NAME = os.getenv("WEBAUTHN_RP_NAME", "Gia Phát Group Consumer")
 # Danh sách origins cho phép, cách nhau bởi dấu phẩy
