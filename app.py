@@ -97,9 +97,10 @@ def create_app() -> Flask:
         app,
         origins=[
             "http://localhost:3000",
-            "https://baocao.nhatminhvn.com",
+            "https://giaphat.io.vn",
+            "https://www.giaphat.io.vn",
             re.compile(r"^http://192\.168\.\d+\.\d+(:\d+)?$"),
-            re.compile(r"^https://[a-z0-9-]+\.nhatminh\.pages\.dev$"),
+            re.compile(r"^https://[a-z0-9-]+\.gia-phat-frontend\.pages\.dev$"),
         ],
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization"],
