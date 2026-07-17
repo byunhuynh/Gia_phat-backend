@@ -20,3 +20,10 @@ Thumbs.db
 .vscode/
 .idea/
 logs/
+
+# ===== Runtime data =====
+# File mẫu đang được Git theo dõi vẫn được giữ; file upload mới không commit.
+uploads/
+
+# File rác sinh ra khi redirect nhầm output của systemctl.
+udo systemctl restart giaphat-backend
