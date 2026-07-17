@@ -88,7 +88,7 @@ def create_app() -> Flask:
 
     app.config["UPLOAD_FOLDER"] = upload_products
     app.config["UPLOAD_FOLDER_CHECKINS"] = upload_checkins
-    app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10 MB upload cap
+    app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20 MB upload cap
 
     # ──────────────────────────────────────────────────────────────
     # CORS

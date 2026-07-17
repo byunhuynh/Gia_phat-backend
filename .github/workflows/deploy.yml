@@ -48,4 +48,4 @@ jobs:
             -p "${VPS_PORT:-22}" \
             -o BatchMode=yes \
             "$VPS_USER@$VPS_HOST" \
-            'set -eu; cd /var/www/backend/Gia_phat-backend; git pull --ff-only origin main; ./venv/bin/pip install --disable-pip-version-check -r requirements.txt; sudo -n systemctl restart giaphat-backend; sudo -n systemctl is-active --quiet giaphat-backend'
+            'set -eu; cd /var/www/backend/Gia_phat-backend; git pull --ff-only origin main; ./venv/bin/pip install --disable-pip-version-check -r requirements.txt; sudo -n systemctl restart giaphat-backend; sleep 3; sudo -n systemctl is-active --quiet giaphat-backend; curl --fail --silent --show-error http://127.0.0.1:5000/ >/dev/null'
