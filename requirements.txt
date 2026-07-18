@@ -7,6 +7,7 @@ gunicorn==25.0.3
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
 alembic==1.18.4
-Pillow==11.2.1
+Pillow==12.3.0
 Flask-Limiter==3.10.1
 webauthn>=2.0.0,<3.0.0
+
