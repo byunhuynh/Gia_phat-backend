@@ -436,7 +436,7 @@ def get_provinces_db():
 
 # ── Soft delete store (non-admin) ─────────────────────────────────────────────
 @bp.route("/stores/<int:store_id>", methods=["DELETE"])
-@token_required(roles=["admin", "director", "regional_director", "supervisor"])
+@token_required(roles=["admin", "director", "regional_director"])
 def delete_store(store_id):
     db = SessionLocal()
     try:
@@ -499,7 +499,7 @@ def delete_store(store_id):
 
 # ── Restore store (non-admin) ─────────────────────────────────────────────────
 @bp.route("/stores/<int:store_id>/restore", methods=["POST"])
-@token_required(roles=["admin", "director", "regional_director", "supervisor"])
+@token_required(roles=["admin", "director", "regional_director"])
 def restore_store(store_id):
     db = SessionLocal()
     try:
@@ -581,7 +581,7 @@ def restore_store(store_id):
 
 # ── Trash stores list (non-admin) ─────────────────────────────────────────────
 @bp.route("/trash/stores", methods=["GET"])
-@token_required(roles=["admin", "director", "regional_director", "supervisor"])
+@token_required(roles=["admin", "director", "regional_director"])
 def get_trash_stores():
     db = SessionLocal()
     try:

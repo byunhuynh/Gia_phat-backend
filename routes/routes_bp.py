@@ -437,7 +437,7 @@ def update_route(route_id):
 
 # ── Soft delete route ─────────────────────────────────────────────────────────
 @bp.route("/routes/<int:route_id>", methods=["DELETE"])
-@token_required(roles=["admin", "director", "regional_director", "supervisor"])
+@token_required(roles=["admin", "director"])
 def delete_route(route_id):
     db = SessionLocal()
     try:
@@ -447,12 +447,6 @@ def delete_route(route_id):
         route = db.query(Route).filter(Route.id == route_id, Route.is_deleted == False).first()
         if not route:
             return jsonify({"message": "Tuyến không tồn tại hoặc đã bị xóa"}), 404
-
-        if current_role != "admin":
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            allowed_user_ids = sub_ids + [current_user_id]
-            if route.user_id not in allowed_user_ids:
-                return jsonify({"message": "Không có quyền xóa tuyến này"}), 403
 
         data = request.get_json(silent=True) or {}
         reason = (data.get("reason") or "").strip()
@@ -502,7 +496,7 @@ def delete_route(route_id):
 
 # ── Restore route ─────────────────────────────────────────────────────────────
 @bp.route("/routes/<int:route_id>/restore", methods=["POST"])
-@token_required(roles=["admin", "director", "regional_director", "supervisor"])
+@token_required(roles=["admin", "director"])
 def restore_route(route_id):
     db = SessionLocal()
     try:
@@ -512,12 +506,6 @@ def restore_route(route_id):
         route = db.query(Route).filter(Route.id == route_id, Route.is_deleted == True).first()
         if not route:
             return jsonify({"message": "Tuyến không tồn tại trong thùng rác"}), 404
-
-        if current_role != "admin":
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            allowed_user_ids = sub_ids + [current_user_id]
-            if route.user_id not in allowed_user_ids:
-                return jsonify({"message": "Không có quyền khôi phục tuyến này"}), 403
 
         route.is_deleted = False
         route.deleted_at = None
@@ -560,7 +548,7 @@ def restore_route(route_id):
 
 # ── Trash routes list ─────────────────────────────────────────────────────────
 @bp.route("/trash/routes", methods=["GET"])
-@token_required(roles=["admin", "director", "regional_director", "supervisor"])
+@token_required(roles=["admin", "director"])
 def get_trash_routes():
     db = SessionLocal()
     try:
@@ -573,11 +561,6 @@ def get_trash_routes():
             .outerjoin(User, User.id == Route.deleted_by)
             .filter(Route.is_deleted == True)
         )
-
-        if current_role != "admin":
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            allowed_user_ids = sub_ids + [current_user_id]
-            query = query.filter(Route.user_id.in_(allowed_user_ids))
 
         rows = query.order_by(Route.deleted_at.desc()).all()
 
