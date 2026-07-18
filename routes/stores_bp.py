@@ -153,7 +153,7 @@ def get_stores():
 
 
 @bp.route("/stores/search", methods=["GET"])
-@token_required(roles=["regional_director", "director", "admin"])
+@token_required()
 def search_stores():
     db = SessionLocal()
     try:

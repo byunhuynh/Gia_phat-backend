@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import func
 
 from db import SessionLocal
-from models import User, Route, Store, Product, SalesOrder, SalesOrderItem, StoreInventory, StoreVisit
+from models import User, Route, Store, Product, SalesOrder, SalesOrderItem, StoreInventory
 from auth import token_required
 from utils.time_utils import now_utc, get_working_date
 from utils.notifications import notify_managers
@@ -43,22 +43,6 @@ def create_order():
         working_date = get_working_date()
         current_role = request.user.get("role", "sales")
 
-        BYPASS_CHECKIN_ROLES = {"regional_director", "director", "admin"}
-
-        if current_role not in BYPASS_CHECKIN_ROLES:
-            visit = (
-                db.query(StoreVisit)
-                .filter(
-                    StoreVisit.user_id == user_id,
-                    StoreVisit.store_id == store_id,
-                    func.date(StoreVisit.visited_at) == working_date,
-                )
-                .first()
-            )
-
-            if not visit:
-                return jsonify({"message": "Bạn chưa check-in điểm bán này hôm nay"}), 403
-
         store = db.get(Store, store_id)
         if not store or store.is_deleted:
             return jsonify({"message": "Cửa hàng không tồn tại"}), 404
@@ -66,7 +50,6 @@ def create_order():
         if current_role != "admin" and store.owner_id != user_id:
             return jsonify({"message": "Điểm bán này không thuộc tài khoản của bạn"}), 403
 
-        # Với các role bypass check-in, vẫn phải kiểm tra store trong phạm vi quản lý
         calculated_total = 0
         order_items_to_save = []
 
