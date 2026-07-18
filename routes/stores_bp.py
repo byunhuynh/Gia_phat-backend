@@ -59,14 +59,6 @@ def create_store():
         if not target_route:
             return jsonify({"message": "Tuyến không tồn tại"}), 400
 
-        if current_role != "admin":
-            if current_role == "sales" and target_route.user_id != current_user_id:
-                return jsonify({"message": "Không có quyền trên tuyến này"}), 403
-            if current_role in ["supervisor", "regional_director", "director"]:
-                sub_ids = get_all_subordinate_ids(db, current_user_id)
-                if target_route.user_id != current_user_id and target_route.user_id not in sub_ids:
-                    return jsonify({"message": "Tuyến không thuộc quyền quản lý"}), 403
-
         similar_codes = (
             db.query(Store.store_code)
             .filter(Store.store_code.like(f"{base_store_code}%"))
@@ -87,6 +79,7 @@ def create_store():
             address=full_address,
             phone=phone,
             route_id=route_id,
+            owner_id=current_user_id,
         )
 
         db.add(new_store)
@@ -139,21 +132,10 @@ def get_stores():
         if not target_route:
             return jsonify({"message": "Tuyến không tồn tại"}), 404
 
-        if current_role == "sales":
-            user = db.get(User, current_user_id)
-            if not user or not user.province:
-                return jsonify({"message": "SALES_CHUA_DUOC_GAN_TINH"}), 400
-        elif current_role != "admin":
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            if target_route.user_id != current_user_id and target_route.user_id not in sub_ids:
-                return jsonify({"message": "Không có quyền"}), 403
-
-        stores = (
-            db.query(Store)
-            .filter(Store.route_id == route_id, Store.is_deleted == False)
-            .order_by(Store.name)
-            .all()
-        )
+        query = db.query(Store).filter(Store.route_id == route_id, Store.is_deleted == False)
+        if current_role != "admin":
+            query = query.filter(Store.owner_id == current_user_id)
+        stores = query.order_by(Store.name).all()
 
         result = [
             {"id": s.id, "name": s.name, "code": s.store_code, "address": s.address, "phone": s.phone}
@@ -186,7 +168,7 @@ def search_stores():
                 User.full_name.label("staff_name"),
             )
             .join(Route, Route.id == Store.route_id)
-            .join(User, User.id == Route.user_id)
+            .join(User, User.id == Store.owner_id)
             .filter(Store.is_deleted == False)
         )
 
@@ -198,16 +180,13 @@ def search_stores():
             ]
             direct_allowed = direct_sub_ids + [current_user_id]
             if current_role != "admin":
-                base_query = base_query.filter(Route.user_id.in_(direct_allowed))
+                base_query = base_query.filter(Store.owner_id == current_user_id)
             limit = 200
             rows = base_query.order_by(Route.route_name, Store.name).limit(limit).all()
         else:
             # Search mode: tìm kiếm toàn bộ phân cấp
             if current_role != "admin":
-                all_sub_ids = get_all_subordinate_ids(db, current_user_id)
-                base_query = base_query.filter(
-                    Route.user_id.in_(all_sub_ids + [current_user_id])
-                )
+                base_query = base_query.filter(Store.owner_id == current_user_id)
             base_query = base_query.filter(
                 or_(
                     Store.name.ilike(f"%{q}%"),
@@ -254,14 +233,9 @@ def create_store_visit():
         if not store_id:
             return jsonify({"message": "STORE_ID_REQUIRED"}), 400
 
-        query = db.query(Store).join(Route).filter(Store.id == store_id, Store.is_deleted == False)
-
-        if role == "sales":
-            query = query.filter(Route.user_id == user_id)
-        elif role != "admin":
-            sub_ids = get_all_subordinate_ids(db, user_id)
-            allowed_user_ids = sub_ids + [user_id]
-            query = query.filter(Route.user_id.in_(allowed_user_ids))
+        query = db.query(Store).filter(Store.id == store_id, Store.is_deleted == False)
+        if role != "admin":
+            query = query.filter(Store.owner_id == user_id)
 
         store = query.first()
         if not store:
@@ -474,10 +448,7 @@ def delete_store(store_id):
             return jsonify({"message": "Điểm bán không tồn tại hoặc đã bị xóa"}), 404
 
         if current_role != "admin":
-            route = db.get(Route, store.route_id)
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            allowed_user_ids = sub_ids + [current_user_id]
-            if not route or route.user_id not in allowed_user_ids:
+            if store.owner_id != current_user_id:
                 return jsonify({"message": "Không có quyền xóa điểm bán này"}), 403
 
         data = request.get_json(silent=True) or {}
@@ -545,9 +516,7 @@ def restore_store(store_id):
         route = db.get(Route, store.route_id)
 
         if current_role != "admin":
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            allowed_user_ids = sub_ids + [current_user_id]
-            if not route or route.user_id not in allowed_user_ids:
+            if store.owner_id != current_user_id:
                 return jsonify({"message": "Không có quyền khôi phục điểm bán này"}), 403
 
         # Khôi phục tuyến cha nếu được yêu cầu và tuyến đang trong thùng rác
@@ -632,9 +601,7 @@ def get_trash_stores():
         )
 
         if current_role != "admin":
-            sub_ids = get_all_subordinate_ids(db, current_user_id)
-            allowed_user_ids = sub_ids + [current_user_id]
-            query = query.filter(Route.user_id.in_(allowed_user_ids))
+            query = query.filter(Store.owner_id == current_user_id)
 
         rows = query.order_by(Store.deleted_at.desc()).all()
 

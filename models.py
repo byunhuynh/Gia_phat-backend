@@ -133,6 +133,7 @@ class Store(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     route_id = Column(Integer, ForeignKey("routes.id"), nullable=False)
+    owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     # Soft delete
     is_deleted = Column(Boolean, default=False, nullable=False)
@@ -143,6 +144,7 @@ class Store(Base):
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
     route = relationship("Route", back_populates="stores")
+    owner = relationship("User", foreign_keys=[owner_id])
     orders = relationship("SalesOrder", back_populates="store", cascade="all, delete")
 
 

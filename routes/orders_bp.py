@@ -63,14 +63,10 @@ def create_order():
         if not store or store.is_deleted:
             return jsonify({"message": "Cửa hàng không tồn tại"}), 404
 
-        # Với các role bypass check-in, vẫn phải kiểm tra store trong phạm vi quản lý
-        if current_role in BYPASS_CHECKIN_ROLES:
-            route = db.get(Route, store.route_id)
-            sub_ids = get_all_subordinate_ids(db, user_id)
-            allowed_user_ids = sub_ids + [user_id]
-            if not route or route.user_id not in allowed_user_ids:
-                return jsonify({"message": "Điểm bán này không thuộc phạm vi quản lý của bạn"}), 403
+        if current_role != "admin" and store.owner_id != user_id:
+            return jsonify({"message": "Điểm bán này không thuộc tài khoản của bạn"}), 403
 
+        # Với các role bypass check-in, vẫn phải kiểm tra store trong phạm vi quản lý
         calculated_total = 0
         order_items_to_save = []
 
@@ -231,8 +227,7 @@ def update_inventory():
 
         accessible = (
             db.query(Store)
-            .join(Route)
-            .filter(Store.id == store_id, Route.user_id == user_id)
+            .filter(Store.id == store_id, Store.owner_id == user_id)
             .first()
         )
 

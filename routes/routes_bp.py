@@ -2,7 +2,7 @@ import re
 import logging
 import uuid
 from flask import Blueprint, request, jsonify
-from sqlalchemy import func, case
+from sqlalchemy import func, case, and_
 from sqlalchemy.exc import IntegrityError
 
 from db import SessionLocal
@@ -118,7 +118,7 @@ def get_vehicle_stores(vehicle_id):
         rows = (
             db.query(Store, Route.route_code, Route.route_name, User.full_name)
             .join(Route, Store.route_id == Route.id)
-            .join(User, Route.user_id == User.id)
+            .join(User, Store.owner_id == User.id)
             .filter(
                 Route.vehicle_id == vehicle_id,
                 Route.is_deleted == False,
@@ -180,6 +180,25 @@ def create_route():
 
         if not route_code or not route_name:
             return jsonify({"message": "Mã tuyến, tên tuyến và tỉnh thành là bắt buộc"}), 400
+
+        existing_route = (
+            db.query(Route)
+            .join(Province, Route.province_id == Province.id)
+            .filter(
+                func.lower(Route.route_name) == route_name.lower(),
+                Province.name == province_name,
+                Route.is_deleted == False,
+            )
+            .first()
+        )
+        if existing_route:
+            return jsonify({
+                "message": "Tuyến đã tồn tại và đang được dùng chung",
+                "id": existing_route.id,
+                "route_code": existing_route.route_code,
+                "province_name": province_name,
+                "existing": True,
+            }), 200
 
         province = db.query(Province).filter(Province.name == province_name).first()
         if not province:
@@ -264,6 +283,13 @@ def get_my_routes():
             sub_ids = get_all_subordinate_ids(db, user_id)
             allowed_user_ids = sub_ids + [user_id]
 
+        visible_store_condition = Store.is_deleted == False
+        if role != "admin":
+            visible_store_condition = and_(
+                Store.is_deleted == False,
+                Store.owner_id == user_id,
+            )
+
         routes = (
             db.query(
                 Route.id,
@@ -275,13 +301,13 @@ def get_my_routes():
                 Vehicle.plate_number.label("vehicle_plate"),
                 Province.name.label("province_name"),
                 User.full_name.label("staff_full_name"),
-                func.count(case((Store.is_deleted == False, Store.id))).label("store_count"),
+                func.count(case((visible_store_condition, Store.id))).label("store_count"),
             )
             .join(User, Route.user_id == User.id)
             .outerjoin(Store, Store.route_id == Route.id)
             .outerjoin(Province, Route.province_id == Province.id)
             .outerjoin(Vehicle, Route.vehicle_id == Vehicle.id)
-            .filter(Route.user_id.in_(allowed_user_ids), Route.is_deleted == False)
+            .filter(Route.is_deleted == False)
             .group_by(
                 Route.id,
                 Route.route_code,

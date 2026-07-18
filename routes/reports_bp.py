@@ -356,7 +356,7 @@ def dashboard_summary():
         store_q = (
             db.query(func.count(Store.id))
             .join(Route)
-            .filter(Route.user_id.in_(user_ids), Store.is_deleted == False,
+            .filter(Store.owner_id.in_(user_ids), Store.is_deleted == False,
                     Store.created_at >= period_from)
         )
         if period_to:
@@ -368,7 +368,7 @@ def dashboard_summary():
         total_stores = (
             db.query(func.count(Store.id))
             .join(Route)
-            .filter(Route.user_id.in_(user_ids), Store.is_deleted == False)
+            .filter(Store.owner_id.in_(user_ids), Store.is_deleted == False)
             .scalar()
         )
         visited = (
@@ -601,7 +601,7 @@ def dashboard_coverage():
         total_stores = (
             db.query(func.count(Store.id))
             .join(Route)
-            .filter(Route.user_id.in_(user_ids), Store.is_deleted == False)
+            .filter(Store.owner_id.in_(user_ids), Store.is_deleted == False)
             .scalar()
         )
         visited = (
