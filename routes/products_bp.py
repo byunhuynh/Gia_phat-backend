@@ -55,7 +55,7 @@ def create_product():
     db = SessionLocal()
 
     try:
-        required_fields = ["sku", "name", "brand_id", "category_id", "price_base"]
+        required_fields = ["sku", "name", "brand_id", "category_id", "base_unit", "price_base"]
         for field in required_fields:
             if not data.get(field):
                 return jsonify({"message": f"{field.upper()}_REQUIRED"}), 400
@@ -70,7 +70,7 @@ def create_product():
             name=data["name"].strip(),
             brand_id=int(data["brand_id"]),
             category_id=int(data["category_id"]),
-            base_unit=data.get("base_unit"),
+            base_unit=str(data["base_unit"]).strip(),
             case_unit=data.get("case_unit"),
             units_per_case=int(data["units_per_case"]) if data.get("units_per_case") else None,
             price_base=float(data["price_base"]),
@@ -126,7 +126,11 @@ def update_product(sku):
         product.name = data.get("name", product.name)
         product.brand_id = int(data.get("brand_id", product.brand_id))
         product.category_id = int(data.get("category_id", product.category_id))
-        product.base_unit = data.get("base_unit", product.base_unit)
+        if "base_unit" in data:
+            base_unit = str(data.get("base_unit") or "").strip()
+            if not base_unit:
+                return jsonify({"message": "BASE_UNIT_REQUIRED"}), 400
+            product.base_unit = base_unit
         product.case_unit = data.get("case_unit", product.case_unit)
         product.units_per_case = int(data["units_per_case"]) if data.get("units_per_case") else None
         product.price_base = float(data["price_base"]) if data.get("price_base") else product.price_base
