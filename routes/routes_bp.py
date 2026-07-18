@@ -70,6 +70,86 @@ def create_vehicle():
         db.close()
 
 
+@bp.route("/vehicles/<int:vehicle_id>", methods=["PATCH"])
+@token_required(roles=["admin"])
+def update_vehicle(vehicle_id):
+    data = request.json or {}
+    plate_number = str(data.get("plate_number", "")).strip().upper()
+    if not plate_number:
+        return jsonify({"message": "Biển số xe không được để trống"}), 400
+
+    db = SessionLocal()
+    try:
+        vehicle = db.get(Vehicle, vehicle_id)
+        if not vehicle:
+            return jsonify({"message": "Xe không tồn tại"}), 404
+
+        duplicate = (
+            db.query(Vehicle)
+            .filter(Vehicle.plate_number == plate_number, Vehicle.id != vehicle_id)
+            .first()
+        )
+        if duplicate:
+            return jsonify({"message": "Biển số xe đã tồn tại"}), 409
+
+        vehicle.plate_number = plate_number
+        db.commit()
+        return jsonify({
+            "id": vehicle.id,
+            "code": vehicle.vehicle_code,
+            "plate_number": vehicle.plate_number,
+        })
+    except IntegrityError:
+        db.rollback()
+        return jsonify({"message": "Biển số xe đã tồn tại"}), 409
+    finally:
+        db.close()
+
+
+@bp.route("/vehicles/<int:vehicle_id>/stores", methods=["GET"])
+@token_required(roles=["admin"])
+def get_vehicle_stores(vehicle_id):
+    db = SessionLocal()
+    try:
+        vehicle = db.get(Vehicle, vehicle_id)
+        if not vehicle:
+            return jsonify({"message": "Xe không tồn tại"}), 404
+
+        rows = (
+            db.query(Store, Route.route_code, Route.route_name)
+            .join(Route, Store.route_id == Route.id)
+            .filter(
+                Route.vehicle_id == vehicle_id,
+                Route.is_deleted == False,
+                Store.is_deleted == False,
+            )
+            .order_by(Route.route_name, Store.name)
+            .all()
+        )
+        return jsonify({
+            "vehicle": {
+                "id": vehicle.id,
+                "code": vehicle.vehicle_code,
+                "plate_number": vehicle.plate_number,
+            },
+            "stores": [
+                {
+                    "id": store.id,
+                    "code": store.store_code,
+                    "name": store.name,
+                    "address": store.address,
+                    "phone": store.phone,
+                    "route_id": store.route_id,
+                    "route_code": route_code,
+                    "route_name": route_name,
+                }
+                for store, route_code, route_name in rows
+            ],
+        })
+    finally:
+        db.close()
+
+
 def get_all_subordinate_ids(db, manager_id):
     all_ids = []
     subs = db.query(User.id).filter(User.manager_id == manager_id).all()
