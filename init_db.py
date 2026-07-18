@@ -55,7 +55,7 @@ def seed_data():
         admin1 = User(
             username="admin",
             password_hash=pwd_context.hash("admin@654"),
-            full_name="Phan Thị Phương Linh",
+            full_name="Admin",
             role="admin",
             status="active",
             created_at=now
