@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint("routes", __name__)
 
+FIXED_ROUTE_PROVINCE = "Trà Vinh"
+
 
 def get_all_subordinate_ids(db, manager_id):
     all_ids = []
@@ -39,19 +41,12 @@ def create_route():
         raw_code = str(data.get("route_code", "")).strip().upper()
         route_code = re.sub(r"[^A-Z0-9_]", "", raw_code)
         route_name = title_case(str(data.get("route_name", "")).strip())
-        province_name = title_case(str(data.get("province_name", "")).strip())
+        province_name = FIXED_ROUTE_PROVINCE
         vehicle_plate = str(data.get("vehicle_plate", "") or "").strip().upper()
         assignee_id = data.get("user_id")
 
-        if not route_code or not route_name or not province_name:
+        if not route_code or not route_name:
             return jsonify({"message": "Mã tuyến, tên tuyến và tỉnh thành là bắt buộc"}), 400
-
-        if current_role == "sales":
-            user = db.get(User, current_user_id)
-            province_name = user.province or province_name
-
-        # Chuẩn hóa: bỏ tiền tố "Tỉnh"/"Thành phố" để đồng nhất với dữ liệu trong DB
-        province_name = re.sub(r"^(Tỉnh|Thành phố)\s+", "", province_name, flags=re.IGNORECASE).strip()
 
         province = db.query(Province).filter(Province.name == province_name).first()
         if not province:
