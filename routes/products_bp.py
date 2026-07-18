@@ -181,7 +181,7 @@ def upload_product_image(sku):
             ratio = max_height / float(height)
             image = image.resize((int(width * ratio), max_height), Image.LANCZOS)
 
-        filename = secure_filename(f"{sku}.webp")
+        filename = secure_filename(f"{sku}-{int(datetime.utcnow().timestamp())}.webp")
         upload_dir = current_app.config["UPLOAD_FOLDER"]
         file_path = os.path.join(upload_dir, filename)
 
@@ -195,7 +195,11 @@ def upload_product_image(sku):
         product.image_url = f"/uploads/products/{filename}"
         db.commit()
 
-        return jsonify({"message": "IMAGE_UPLOADED", "image_url": product.image_url})
+        response = jsonify({"message": "IMAGE_UPLOADED", "image_url": product.image_url})
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     except Exception:
         db.rollback()

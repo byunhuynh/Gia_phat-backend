@@ -6,7 +6,7 @@ import logging.config
 import os
 import re
 
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -163,11 +163,19 @@ def create_app() -> Flask:
     # ──────────────────────────────────────────────────────────────
     @app.route("/uploads/products/<path:filename>")
     def uploaded_product_file(filename):
-        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+        response = make_response(send_from_directory(app.config["UPLOAD_FOLDER"], filename))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     @app.route("/uploads/checkins/<path:filename>")
     def uploaded_checkin_file(filename):
-        return send_from_directory(app.config["UPLOAD_FOLDER_CHECKINS"], filename)
+        response = make_response(send_from_directory(app.config["UPLOAD_FOLDER_CHECKINS"], filename))
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     # ──────────────────────────────────────────────────────────────
     # HEALTH CHECK
