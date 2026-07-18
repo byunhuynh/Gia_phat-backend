@@ -21,20 +21,28 @@ def upgrade() -> None:
     op.create_table(
         'vehicles',
         sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('vehicle_code', sa.String(length=20), nullable=False),
         sa.Column('plate_number', sa.String(length=20), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('plate_number')
+        sa.UniqueConstraint('plate_number'),
+        sa.UniqueConstraint('vehicle_code')
     )
     op.add_column('routes', sa.Column('vehicle_id', sa.Integer(), nullable=True))
     op.create_foreign_key('fk_routes_vehicle_id', 'routes', 'vehicles', ['vehicle_id'], ['id'])
 
     # Move existing plate values into the normalized vehicle table.
     op.execute(sa.text("""
-        INSERT INTO vehicles (plate_number, created_at)
-        SELECT DISTINCT UPPER(TRIM(vehicle_plate)), CURRENT_TIMESTAMP
-        FROM routes
-        WHERE vehicle_plate IS NOT NULL AND TRIM(vehicle_plate) <> ''
+        INSERT INTO vehicles (vehicle_code, plate_number, created_at)
+        SELECT
+            'XE-' || LPAD(ROW_NUMBER() OVER (ORDER BY plate_number)::TEXT, 6, '0'),
+            plate_number,
+            CURRENT_TIMESTAMP
+        FROM (
+            SELECT DISTINCT UPPER(TRIM(vehicle_plate)) AS plate_number
+            FROM routes
+            WHERE vehicle_plate IS NOT NULL AND TRIM(vehicle_plate) <> ''
+        ) existing_plates
     """))
     op.execute(sa.text("""
         UPDATE routes

@@ -66,6 +66,7 @@ class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True)
+    vehicle_code = Column(String(20), nullable=False, unique=True)
     plate_number = Column(String(20), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), default=utc_now)
 

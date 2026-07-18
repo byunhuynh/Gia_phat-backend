@@ -1,5 +1,6 @@
 import re
 import logging
+import uuid
 from flask import Blueprint, request, jsonify
 from sqlalchemy import func, case
 from sqlalchemy.exc import IntegrityError
@@ -17,6 +18,56 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("routes", __name__)
 
 FIXED_ROUTE_PROVINCE = "Trà Vinh"
+
+
+@bp.route("/vehicles", methods=["GET"])
+@token_required()
+def get_vehicles():
+    db = SessionLocal()
+    try:
+        vehicles = db.query(Vehicle).order_by(Vehicle.vehicle_code).all()
+        return jsonify([
+            {
+                "id": vehicle.id,
+                "code": vehicle.vehicle_code,
+                "plate_number": vehicle.plate_number,
+            }
+            for vehicle in vehicles
+        ])
+    finally:
+        db.close()
+
+
+@bp.route("/vehicles", methods=["POST"])
+@token_required(roles=["admin"])
+def create_vehicle():
+    data = request.json or {}
+    plate_number = str(data.get("plate_number", "")).strip().upper()
+    if not plate_number:
+        return jsonify({"message": "Biển số xe không được để trống"}), 400
+
+    db = SessionLocal()
+    try:
+        if db.query(Vehicle).filter(Vehicle.plate_number == plate_number).first():
+            return jsonify({"message": "Biển số xe đã tồn tại"}), 409
+
+        vehicle = Vehicle(
+            vehicle_code=f"XE-{uuid.uuid4().hex[:6].upper()}",
+            plate_number=plate_number,
+        )
+        db.add(vehicle)
+        db.commit()
+        db.refresh(vehicle)
+        return jsonify({
+            "id": vehicle.id,
+            "code": vehicle.vehicle_code,
+            "plate_number": vehicle.plate_number,
+        }), 201
+    except IntegrityError:
+        db.rollback()
+        return jsonify({"message": "Biển số hoặc mã xe đã tồn tại"}), 409
+    finally:
+        db.close()
 
 
 def get_all_subordinate_ids(db, manager_id):
@@ -42,7 +93,7 @@ def create_route():
         route_code = re.sub(r"[^A-Z0-9_]", "", raw_code)
         route_name = title_case(str(data.get("route_name", "")).strip())
         province_name = FIXED_ROUTE_PROVINCE
-        vehicle_plate = str(data.get("vehicle_plate", "") or "").strip().upper()
+        vehicle_id = data.get("vehicle_id")
         assignee_id = data.get("user_id")
 
         if not route_code or not route_name:
@@ -55,12 +106,10 @@ def create_route():
             db.flush()
 
         vehicle = None
-        if vehicle_plate:
-            vehicle = db.query(Vehicle).filter(Vehicle.plate_number == vehicle_plate).first()
+        if vehicle_id not in (None, ""):
+            vehicle = db.get(Vehicle, int(vehicle_id))
             if not vehicle:
-                vehicle = Vehicle(plate_number=vehicle_plate)
-                db.add(vehicle)
-                db.flush()
+                return jsonify({"message": "Xe được chọn không tồn tại"}), 400
 
         final_assignee_id = current_user_id
         if assignee_id:
@@ -140,6 +189,7 @@ def get_my_routes():
                 Route.route_name,
                 Route.user_id,
                 Route.vehicle_id,
+                Vehicle.vehicle_code.label("vehicle_code"),
                 Vehicle.plate_number.label("vehicle_plate"),
                 Province.name.label("province_name"),
                 User.full_name.label("staff_full_name"),
@@ -156,6 +206,7 @@ def get_my_routes():
                 Route.route_name,
                 Route.user_id,
                 Route.vehicle_id,
+                Vehicle.vehicle_code,
                 Vehicle.plate_number,
                 Province.name,
                 User.full_name,
@@ -170,6 +221,8 @@ def get_my_routes():
                 "code": r.route_code,
                 "name": r.route_name,
                 "province_name": r.province_name,
+                "vehicle_id": r.vehicle_id,
+                "vehicle_code": r.vehicle_code,
                 "vehicle_plate": r.vehicle_plate,
                 "user_id": r.user_id,
                 "staffFullName": r.staff_full_name,
@@ -246,23 +299,23 @@ def update_route(route_id):
                 return jsonify({"message": "Tên tuyến không được để trống"}), 400
             route.route_name = new_name
 
-        if "vehicle_plate" in data:
-            plate = str(data.get("vehicle_plate", "") or "").strip().upper() or None
-            if plate:
-                vehicle = db.query(Vehicle).filter(Vehicle.plate_number == plate).first()
-                if not vehicle:
-                    vehicle = Vehicle(plate_number=plate)
-                    db.add(vehicle)
-                    db.flush()
-                route.vehicle_id = vehicle.id
-            else:
+        if "vehicle_id" in data:
+            vehicle_id = data.get("vehicle_id")
+            if vehicle_id in (None, ""):
                 route.vehicle_id = None
+            else:
+                vehicle = db.get(Vehicle, int(vehicle_id))
+                if not vehicle:
+                    return jsonify({"message": "Xe được chọn không tồn tại"}), 400
+                route.vehicle_id = vehicle.id
 
         db.commit()
         return jsonify({
             "message": "Cập nhật tuyến thành công",
             "id": route.id,
             "route_name": route.route_name,
+            "vehicle_id": route.vehicle_id,
+            "vehicle_code": route.vehicle.vehicle_code if route.vehicle else None,
             "vehicle_plate": route.vehicle.plate_number if route.vehicle else None,
         })
 
