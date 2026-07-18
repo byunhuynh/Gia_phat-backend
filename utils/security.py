@@ -1,7 +1,7 @@
 import re
 import unicodedata
 
-ROLE_ORDER = ["sales", "supervisor", "regional_director", "director", "admin"]
+ROLE_ORDER = ["accountant", "sales", "supervisor", "regional_director", "director", "admin"]
 
 
 def role_index(role: str) -> int:

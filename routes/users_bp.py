@@ -19,6 +19,7 @@ bp = Blueprint("users", __name__)
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 _ROLE_LABELS_VN = {
+    "accountant": "Kế toán",
     "sales": "Nhân viên thị trường",
     "supervisor": "Giám sát kinh doanh",
     "regional_director": "Giám đốc khu vực",
@@ -156,6 +157,8 @@ def create_user():
             return jsonify({"message": "DISTRICT_REQUIRED"}), 400
         if role not in ROLE_ORDER:
             return jsonify({"message": "ROLE_KHONG_HOP_LE"}), 400
+        if role == "accountant" and current_user.role != "admin":
+            return jsonify({"message": "CHI_ADMIN_DUOC_TAO_KE_TOAN"}), 403
 
         exists = db.query(User).filter(User.username == username).first()
         if exists:
@@ -331,6 +334,8 @@ def update_user(user_id):
         if new_role:
             if new_role not in ROLE_ORDER:
                 return jsonify({"message": "ROLE_KHONG_HOP_LE"}), 400
+            if new_role == "accountant" and current_user.role != "admin":
+                return jsonify({"message": "CHI_ADMIN_DUOC_GAN_CHUC_VU_KE_TOAN"}), 403
             if role_index(new_role) >= role_index(current_user.role):
                 return jsonify({"message": "KHONG_DU_QUYEN_GAN_ROLE_NAY"}), 403
             target_user.role = new_role
