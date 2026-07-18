@@ -440,7 +440,7 @@ def admin_restore_store(store_id):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @bp.route("/orders", methods=["GET"])
-@token_required(roles=["admin"])
+@token_required(roles=["admin", "accountant"])
 def admin_get_orders():
     db = SessionLocal()
     try:
@@ -456,7 +456,7 @@ def admin_get_orders():
 
         query = (
             db.query(
-                SalesOrder.id, SalesOrder.order_code, SalesOrder.total_amount, SalesOrder.created_at,
+                SalesOrder.id, SalesOrder.order_code, SalesOrder.total_amount, SalesOrder.is_paid, SalesOrder.created_at,
                 Store.id.label("store_id"), Store.name.label("store_name"), Store.store_code.label("store_code"),
                 User.id.label("user_id"), User.full_name.label("staff_name"),
                 func.count(SalesOrderItem.id).label("item_count"),
@@ -467,7 +467,7 @@ def admin_get_orders():
             .outerjoin(SalesOrderItem, SalesOrderItem.order_id == SalesOrder.id)
             .filter(SalesOrder.is_deleted == False)
             .group_by(
-                SalesOrder.id, SalesOrder.order_code, SalesOrder.total_amount, SalesOrder.created_at,
+                SalesOrder.id, SalesOrder.order_code, SalesOrder.total_amount, SalesOrder.is_paid, SalesOrder.created_at,
                 Store.id, Store.name, Store.store_code, User.id, User.full_name,
             )
         )
@@ -500,6 +500,7 @@ def admin_get_orders():
             {
                 "id": r.id, "order_code": r.order_code,
                 "total_amount": float(r.total_amount) if r.total_amount else 0,
+                "is_paid": bool(r.is_paid),
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "store_id": r.store_id, "store_name": r.store_name, "store_code": r.store_code,
                 "user_id": r.user_id, "staff_name": r.staff_name,
@@ -519,7 +520,7 @@ def admin_get_orders():
 
 
 @bp.route("/orders/<int:order_id>/detail", methods=["GET"])
-@token_required(roles=["admin"])
+@token_required(roles=["admin", "accountant"])
 def admin_get_order_detail(order_id):
     db = SessionLocal()
     try:
@@ -551,6 +552,7 @@ def admin_get_order_detail(order_id):
         return jsonify({
             "id": order.id, "order_code": order.order_code,
             "total_amount": float(order.total_amount) if order.total_amount else 0,
+            "is_paid": bool(order.is_paid),
             "created_at": order.created_at.isoformat() if order.created_at else None,
             "store_name": store.name if store else "—",
             "store_code": store.store_code if store else "—",
@@ -573,6 +575,38 @@ def admin_get_order_detail(order_id):
 
     except Exception:
         logger.exception("admin_get_order_detail failed for order_id=%s", order_id)
+        return jsonify({"message": "LOI_HE_THONG"}), 500
+    finally:
+        db.close()
+
+
+@bp.route("/orders/<int:order_id>/payment", methods=["PATCH"])
+@token_required(roles=["admin", "accountant"])
+def update_order_payment(order_id):
+    db = SessionLocal()
+    try:
+        order = db.query(SalesOrder).filter(
+            SalesOrder.id == order_id,
+            SalesOrder.is_deleted == False,
+        ).first()
+        if not order:
+            return jsonify({"message": "Đơn hàng không tồn tại"}), 404
+
+        data = request.json or {}
+        if "is_paid" not in data or not isinstance(data["is_paid"], bool):
+            return jsonify({"message": "Trạng thái thanh toán không hợp lệ"}), 400
+
+        order.is_paid = data["is_paid"]
+        db.commit()
+        return jsonify({
+            "id": order.id,
+            "order_code": order.order_code,
+            "is_paid": order.is_paid,
+            "message": "Đã cập nhật trạng thái thanh toán",
+        })
+    except Exception:
+        db.rollback()
+        logger.exception("update_order_payment failed for order_id=%s", order_id)
         return jsonify({"message": "LOI_HE_THONG"}), 500
     finally:
         db.close()

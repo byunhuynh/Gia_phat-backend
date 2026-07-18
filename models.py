@@ -231,6 +231,7 @@ class SalesOrder(Base):
     store_id = Column(Integer, ForeignKey("stores.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     total_amount = Column(DECIMAL(15, 2), default=0)
+    is_paid = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
     # Soft delete
