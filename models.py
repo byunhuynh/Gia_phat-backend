@@ -62,6 +62,16 @@ class Province(Base):
     name = Column(String(100), nullable=False)
     routes = relationship("Route", back_populates="province")
 
+class Vehicle(Base):
+    __tablename__ = "vehicles"
+
+    id = Column(Integer, primary_key=True)
+    plate_number = Column(String(20), nullable=False, unique=True)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    routes = relationship("Route", back_populates="vehicle")
+
+
 class Route(Base):
     __tablename__ = "routes"
 
@@ -70,6 +80,7 @@ class Route(Base):
     route_name = Column(String(100))
 
     province_id = Column(Integer, ForeignKey("provinces.id"))
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
 
@@ -96,6 +107,8 @@ class Route(Base):
         "User",
         foreign_keys=[created_by]
     )
+
+    vehicle = relationship("Vehicle", back_populates="routes")
 
     # 🔥 Quan hệ store
     stores = relationship(

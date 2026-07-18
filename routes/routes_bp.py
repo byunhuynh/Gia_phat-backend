@@ -5,7 +5,7 @@ from sqlalchemy import func, case
 from sqlalchemy.exc import IntegrityError
 
 from db import SessionLocal
-from models import User, Route, Store, Province, StoreVisit
+from models import User, Route, Store, Province, StoreVisit, Vehicle
 from auth import token_required
 from utils.security import ROLE_ORDER
 from utils.time_utils import get_working_date, now_utc
@@ -40,6 +40,7 @@ def create_route():
         route_code = re.sub(r"[^A-Z0-9_]", "", raw_code)
         route_name = title_case(str(data.get("route_name", "")).strip())
         province_name = title_case(str(data.get("province_name", "")).strip())
+        vehicle_plate = str(data.get("vehicle_plate", "") or "").strip().upper()
         assignee_id = data.get("user_id")
 
         if not route_code or not route_name or not province_name:
@@ -58,6 +59,14 @@ def create_route():
             db.add(province)
             db.flush()
 
+        vehicle = None
+        if vehicle_plate:
+            vehicle = db.query(Vehicle).filter(Vehicle.plate_number == vehicle_plate).first()
+            if not vehicle:
+                vehicle = Vehicle(plate_number=vehicle_plate)
+                db.add(vehicle)
+                db.flush()
+
         final_assignee_id = current_user_id
         if assignee_id:
             if current_role == "admin":
@@ -72,6 +81,7 @@ def create_route():
         new_route = Route(
             route_code=route_code,
             route_name=route_name,
+            vehicle_id=vehicle.id if vehicle else None,
             province_id=province.id,
             user_id=final_assignee_id,
             created_by=current_user_id,
@@ -134,6 +144,8 @@ def get_my_routes():
                 Route.route_code,
                 Route.route_name,
                 Route.user_id,
+                Route.vehicle_id,
+                Vehicle.plate_number.label("vehicle_plate"),
                 Province.name.label("province_name"),
                 User.full_name.label("staff_full_name"),
                 func.count(case((Store.is_deleted == False, Store.id))).label("store_count"),
@@ -141,12 +153,15 @@ def get_my_routes():
             .join(User, Route.user_id == User.id)
             .outerjoin(Store, Store.route_id == Route.id)
             .outerjoin(Province, Route.province_id == Province.id)
+            .outerjoin(Vehicle, Route.vehicle_id == Vehicle.id)
             .filter(Route.user_id.in_(allowed_user_ids), Route.is_deleted == False)
             .group_by(
                 Route.id,
                 Route.route_code,
                 Route.route_name,
                 Route.user_id,
+                Route.vehicle_id,
+                Vehicle.plate_number,
                 Province.name,
                 User.full_name,
             )
@@ -160,6 +175,7 @@ def get_my_routes():
                 "code": r.route_code,
                 "name": r.route_name,
                 "province_name": r.province_name,
+                "vehicle_plate": r.vehicle_plate,
                 "user_id": r.user_id,
                 "staffFullName": r.staff_full_name,
                 "store_count": int(r.store_count or 0),
@@ -206,6 +222,59 @@ def get_my_route_today():
             "working_date": working_date.isoformat(),
         })
 
+    finally:
+        db.close()
+
+
+@bp.route("/routes/<int:route_id>", methods=["PATCH"])
+@token_required(roles=["admin", "director", "regional_director", "supervisor", "sales"])
+def update_route(route_id):
+    db = SessionLocal()
+    try:
+        route = db.query(Route).filter(Route.id == route_id, Route.is_deleted == False).first()
+        if not route:
+            return jsonify({"message": "Tuyến không tồn tại"}), 404
+
+        data = request.json or {}
+        current_user_id = request.user["id"]
+        current_role = request.user["role"]
+
+        if current_role != "admin":
+            sub_ids = get_all_subordinate_ids(db, current_user_id)
+            allowed_user_ids = sub_ids + [current_user_id]
+            if route.user_id not in allowed_user_ids:
+                return jsonify({"message": "Không có quyền sửa tuyến này"}), 403
+
+        if "route_name" in data:
+            new_name = title_case(str(data.get("route_name", "")).strip())
+            if not new_name:
+                return jsonify({"message": "Tên tuyến không được để trống"}), 400
+            route.route_name = new_name
+
+        if "vehicle_plate" in data:
+            plate = str(data.get("vehicle_plate", "") or "").strip().upper() or None
+            if plate:
+                vehicle = db.query(Vehicle).filter(Vehicle.plate_number == plate).first()
+                if not vehicle:
+                    vehicle = Vehicle(plate_number=plate)
+                    db.add(vehicle)
+                    db.flush()
+                route.vehicle_id = vehicle.id
+            else:
+                route.vehicle_id = None
+
+        db.commit()
+        return jsonify({
+            "message": "Cập nhật tuyến thành công",
+            "id": route.id,
+            "route_name": route.route_name,
+            "vehicle_plate": route.vehicle.plate_number if route.vehicle else None,
+        })
+
+    except Exception:
+        db.rollback()
+        logger.exception("update_route failed for route_id=%s", route_id)
+        return jsonify({"message": "LOI_HE_THONG"}), 500
     finally:
         db.close()
 
@@ -362,6 +431,7 @@ def get_trash_routes():
                 "code": r.Route.route_code,
                 "name": r.Route.route_name,
                 "province_name": r.province_name,
+                "vehicle_plate": r.Route.vehicle.plate_number if r.Route.vehicle else None,
                 "staff_id": r.Route.user_id,
                 "deleted_at": r.Route.deleted_at.isoformat() if r.Route.deleted_at else None,
                 "deleted_by_name": r.deleted_by_name,
