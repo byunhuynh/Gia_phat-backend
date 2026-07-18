@@ -116,8 +116,9 @@ def get_vehicle_stores(vehicle_id):
             return jsonify({"message": "Xe không tồn tại"}), 404
 
         rows = (
-            db.query(Store, Route.route_code, Route.route_name)
+            db.query(Store, Route.route_code, Route.route_name, User.full_name)
             .join(Route, Store.route_id == Route.id)
+            .join(User, Route.user_id == User.id)
             .filter(
                 Route.vehicle_id == vehicle_id,
                 Route.is_deleted == False,
@@ -142,8 +143,9 @@ def get_vehicle_stores(vehicle_id):
                     "route_id": store.route_id,
                     "route_code": route_code,
                     "route_name": route_name,
+                    "staff_name": staff_name,
                 }
-                for store, route_code, route_name in rows
+                for store, route_code, route_name, staff_name in rows
             ],
         })
     finally:
